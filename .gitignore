@@ -1,0 +1,6 @@
+vendor
+build/*
+!build/.gitkeep
+config/*
+!config/.gitkeep
+composer.lock
