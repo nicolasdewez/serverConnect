@@ -37,6 +37,6 @@ class BuildCommand extends Command
         $configuration = $config->process($nameConfig);
 
         $builder = new Builder();
-        $builder->buildConfig($nameConfig, $configuration);
+        $builder->build($nameConfig, $configuration);
     }
 }

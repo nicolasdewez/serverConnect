@@ -10,10 +10,18 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 class Builder
 {
+    const OPERATION_SH = 'sh';
+    const OPERATION_SCP = 'scp';
+
     const SKEL_SH = 'sh.sh';
     const SKEL_SH_FUNC = 'sh_function.sh';
     const SKEL_SH_CASE = 'sh_case.sh';
     const SKEL_SH_MAIN = 'sh_main.sh';
+
+    const SKEL_SCP = 'scp.sh';
+    const SKEL_SCP_FUNC = 'scp_function.sh';
+    const SKEL_SCP_CASE = 'scp_case.sh';
+    const SKEL_SCP_MAIN = 'scp_main.sh';
 
     /** @var string */
     private $pathBuild;
@@ -36,36 +44,54 @@ class Builder
      * @param string $name
      * @param array  $configuration
      */
-    public function buildConfig($name, array $configuration)
+    public function build($name, array $configuration)
     {
-        $path = sprintf('%s/%s.sh', $this->pathBuild, $name);
+        $this->buildConfig($name, self::OPERATION_SH, $configuration);
+        $this->buildConfig($name, self::OPERATION_SCP, $configuration);
+    }
 
-        $shSkeleton = $this->getSkeleton(self::SKEL_SH);
-        $functionSkeleton = $this->getSkeleton(self::SKEL_SH_FUNC);
-        $caseSkeleton = $this->getSkeleton(self::SKEL_SH_CASE);
-        $mainSkeleton = $this->getSkeleton(self::SKEL_SH_MAIN);
+    /**
+     * @param string $name
+     * @param string $operation
+     * @param array  $configuration
+     */
+    private function buildConfig($name, $operation, array $configuration)
+    {
+        $upperOperation = strtoupper($operation);
 
-        $content = $shSkeleton;
-        $contentMain = $mainSkeleton;
+        $path = sprintf('%s/%s.%s', $this->pathBuild, $name, $operation);
+
+        list ($operationSkl, $functionSkl, $caseSkl, $mainSkl) = $this->getSkeletons($operation);
+
+        $content = $operationSkl;
+        $contentMain = $mainSkl;
         $contentFunctions = '';
         $contentCases = '';
 
         foreach ($configuration['connections'] as $connectionName => $connection) {
-            list($function, $case) = $this->buildConnection($connectionName, $connection, $functionSkeleton, $caseSkeleton);
+            list($function, $case) = $this->buildConnection($operation, $connectionName, $connection, $functionSkl, $caseSkl);
             $contentFunctions .= $function;
             $contentCases .= $case;
         }
 
-        $content = str_replace('__SH_FUNCTIONS__', $contentFunctions, $content);
+        $content = str_replace(sprintf('__%s_FUNCTIONS__', $upperOperation), $contentFunctions, $content);
         $contentMain = str_replace('__CASES__', $contentCases, $contentMain);
-        $content = str_replace('__SH_MAIN__', $contentMain, $content);
+        $content = str_replace(sprintf('__%s_MAIN__', $upperOperation), $contentMain, $content);
 
-        // Save file
         $this->fileSystem->dumpFile($path, $content);
         $this->fileSystem->chmod($path, 0775);
     }
 
-    private function buildConnection($name, array $connection, $functionSkeleton, $caseSkeleton)
+    /**
+     * @param string $operation
+     * @param string $name
+     * @param array  $connection
+     * @param string $functionSkeleton
+     * @param string $caseSkeleton
+     *
+     * @return array
+     */
+    private function buildConnection($operation, $name, array $connection, $functionSkeleton, $caseSkeleton)
     {
         $function = str_replace(
             ['__FUNCTION_NAME__', '__HOSTNAME__', '__USERNAME__', '__PASSWORD__'],
@@ -75,11 +101,39 @@ class Builder
 
         $case = str_replace(
             ['__CONNECTION_NAME__', '__FUNCTION_NAME__'],
-            [$name, 'sh_'.$name],
+            [$name, sprintf('%s_%s', $operation, $name)],
             $caseSkeleton
         );
 
         return [$function, $case];
+    }
+
+    /**
+     * @param string $operation
+     *
+     * @return array
+     */
+    private function getSkeletons($operation)
+    {
+        switch ($operation) {
+            case self::OPERATION_SH:
+                return [
+                    $this->getSkeleton(self::SKEL_SH),
+                    $this->getSkeleton(self::SKEL_SH_FUNC),
+                    $this->getSkeleton(self::SKEL_SH_CASE),
+                    $this->getSkeleton(self::SKEL_SH_MAIN)
+                ];
+
+            case self::OPERATION_SCP:
+                return [
+                    $this->getSkeleton(self::SKEL_SCP),
+                    $this->getSkeleton(self::SKEL_SCP_FUNC),
+                    $this->getSkeleton(self::SKEL_SCP_CASE),
+                    $this->getSkeleton(self::SKEL_SCP_MAIN)
+                ];
+        }
+
+        return [];
     }
 
     /**

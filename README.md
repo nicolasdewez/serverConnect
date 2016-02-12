@@ -41,4 +41,6 @@ app.php build test
 
 The parameter `test` is the configuration name
 
-After execution, a script was created into directory build (name is `test.sh`)
+After execution, two script were created into directory build :
+* `test.sh` for ssh connect
+* `test.scp` for use scp command
